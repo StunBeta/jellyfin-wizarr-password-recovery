@@ -62,10 +62,24 @@ public class PasswordResetFileWatcher : IHostedService, IDisposable
 
         _watcher.Created += (_, e) => _ = Task.Run(() => HandleCreatedAsync(e.FullPath));
         _watcher.Renamed += (_, e) => _ = Task.Run(() => HandleCreatedAsync(e.FullPath));
+        _watcher.Changed += (_, e) => _ = Task.Run(() => HandleCreatedAsync(e.FullPath));
 
         _logger.LogInformation("PasswordRecovery: watching {Dir} for {Filter}", programDataPath, _watcher.Filter);
-        var existing = Directory.GetFiles(programDataPath, $"{ResetPrefix}*.json", SearchOption.TopDirectoryOnly).Length;
-        _logger.LogInformation("PasswordRecovery: existing reset files count at startup: {Count}", existing);
+        var existingFiles = Directory.GetFiles(programDataPath, $"{ResetPrefix}*.json", SearchOption.TopDirectoryOnly);
+        foreach (var f in existingFiles)
+        {
+            try
+            {
+                File.Delete(f);
+                _logger.LogInformation("PasswordRecovery: deleted stale reset file {Path}", f);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "PasswordRecovery: could not delete stale reset file {Path}", f);
+            }
+        }
+
+        _logger.LogInformation("PasswordRecovery: existing reset files cleaned: {Count}", existingFiles.Length);
         return Task.CompletedTask;
     }
 
@@ -127,6 +141,11 @@ public class PasswordResetFileWatcher : IHostedService, IDisposable
                 return;
             }
 
+            // Delete the file immediately after successful parse to prevent
+            // stale files from blocking future resets. File ownership released
+            // once Jellyfin finishes writing (which we verified by parsing OK).
+            DeleteFile(fullPath);
+
             if (reset.ExpirationDate <= DateTime.UtcNow)
             {
                 return;
@@ -164,16 +183,6 @@ public class PasswordResetFileWatcher : IHostedService, IDisposable
             _lastSentByUsername[username] = now;
 
             _logger.LogInformation("PasswordRecovery: reset email sent for {User}", username);
-            try
-                {
-                    File.Delete(fullPath);
-                    _logger.LogInformation("PasswordRecovery: deleted reset file {Path}", fullPath);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "PasswordRecovery: could not delete reset file {Path}", fullPath);
-                }
-
         }
         catch (Exception ex)
         {
@@ -390,7 +399,20 @@ public class PasswordResetFileWatcher : IHostedService, IDisposable
         }
     }
 
-private Task SendEmailAsync(PluginConfiguration config, string toEmail, string username, string resetLink)
+    private void DeleteFile(string fullPath)
+    {
+        try
+        {
+            File.Delete(fullPath);
+            _logger.LogInformation("PasswordRecovery: deleted reset file {Path}", fullPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PasswordRecovery: could not delete reset file {Path}", fullPath);
+        }
+    }
+
+    private Task SendEmailAsync(PluginConfiguration config, string toEmail, string username, string resetLink)
     {
         _logger.LogInformation("PasswordRecovery: SendEmailAsync resetLink = '{ResetLink}'", resetLink);
 
