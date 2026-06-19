@@ -9,11 +9,11 @@
     "imageUrl": "https://raw.githubusercontent.com/StunBeta/jellyfin-wizarr-password-recovery/master/Jellyfin.Plugin.PasswordRecovery/icon.png",
     "versions": [
       {
-        "version": "1.2.4",
+        "version": "1.2.5",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/StunBeta/jellyfin-wizarr-password-recovery/releases/download/v1.2.4/Jellyfin.Plugin.WizarrPasswordRecovery_1.2.4.zip",
-        "checksum": "8e16c313992e578f3c5487c6fc447685",
-        "timestamp": "2026-06-19T23:46:52Z"
+        "sourceUrl": "https://github.com/StunBeta/jellyfin-wizarr-password-recovery/releases/download/v1.2.5/Jellyfin.Plugin.WizarrPasswordRecovery_1.2.5.zip",
+        "checksum": "4260a4e2a09a93234a5ce8a1f05e4e8c",
+        "timestamp": "2026-06-19T23:49:03Z"
       }
     ]
   }
