@@ -23,6 +23,7 @@ public class PasswordResetFileWatcher : IHostedService, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
 
     private FileSystemWatcher? _watcher;
+    private readonly object _dedupLock = new();
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastSentByUsername = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastProcessedByFile = new(StringComparer.OrdinalIgnoreCase);
 
@@ -114,14 +115,17 @@ public class PasswordResetFileWatcher : IHostedService, IDisposable
             }
             _logger.LogDebug("PasswordRecovery: detected reset file event for {Path}", fullPath);
 
-            // Avoid duplicate sends for the same file on close event bursts.
+            // Thread-safe dedup: only one thread passes the 5s window per file.
             var now = DateTimeOffset.UtcNow;
-            if (_lastProcessedByFile.TryGetValue(fullPath, out var lastProcessed)
-                && (now - lastProcessed) < TimeSpan.FromSeconds(5))
+            lock (_dedupLock)
             {
-                return;
+                if (_lastProcessedByFile.TryGetValue(fullPath, out var lastProcessed)
+                    && (now - lastProcessed) < TimeSpan.FromSeconds(5))
+                {
+                    return;
+                }
+                _lastProcessedByFile[fullPath] = now;
             }
-            _lastProcessedByFile[fullPath] = now;
 
             // Read with retries because Jellyfin may still be writing.
             SerializablePasswordReset? reset = null;
